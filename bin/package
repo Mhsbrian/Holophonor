@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd -- "$(dirname -- "$0")/.."
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "Commit changes before packaging; the archive is built from HEAD." >&2
+  exit 1
+fi
+version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+git archive --format=tar --prefix="holophonor-${version}/" HEAD | gzip -n > "pkgbuild/holophonor-${version}.tar.gz"
+export HOLOPHONOR_SOURCE_SHA256
+HOLOPHONOR_SOURCE_SHA256="$(sha256sum "pkgbuild/holophonor-${version}.tar.gz" | cut -d ' ' -f 1)"
+cd pkgbuild
+makepkg --force "$@"

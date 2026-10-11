@@ -1,0 +1,33 @@
+pkgname=holophonor
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='An expressive wind instrument and a living canvas'
+arch=('x86_64')
+url='https://github.com/Mhsbrian/Holophonor'
+license=('MIT')
+depends=('alsa-lib' 'libglvnd' 'libxkbcommon' 'wayland' 'libx11' 'libxcursor' 'libxi' 'libxrandr')
+makedepends=('cargo' 'pkgconf' 'gcc')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=("${HOLOPHONOR_SOURCE_SHA256:?Build this local source package with bin/package}")
+
+build() {
+  cd "$srcdir/$pkgname-$pkgver"
+  # Reuse the workspace's build cache without changing the packaged sources.
+  CARGO_TARGET_DIR="$startdir/../target" cargo build --release --locked
+}
+
+check() {
+  cd "$srcdir/$pkgname-$pkgver"
+  CARGO_TARGET_DIR="$startdir/../target" cargo test --release --locked --all-targets
+}
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  install -Dm755 "$startdir/../target/release/holophonor" "$pkgdir/usr/bin/holophonor"
+  install -Dm644 pkgbuild/holophonor.desktop "$pkgdir/usr/share/applications/holophonor.desktop"
+  install -Dm644 pkgbuild/holophonor.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/holophonor.svg"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/holophonor/LICENSE"
+  install -Dm644 assets/fonts/LICENSE "$pkgdir/usr/share/licenses/holophonor/FONT-LICENSE"
+  install -Dm644 docs/THIRD_PARTY_LICENSES.md "$pkgdir/usr/share/licenses/holophonor/THIRD_PARTY_LICENSES.md"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/holophonor/README.md"
+}
