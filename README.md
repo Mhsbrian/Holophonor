@@ -1,28 +1,30 @@
-# Holophonor
+<p align="center">
+  <img src="docs/images/banner.jpg" width="100%" alt="Breathe to begin. A brush writes the melody across raw xuan paper, sealed in vermilion.">
+</p>
 
-Breathe into an EWI and paint with sound.
+<h1 align="center"><em>Holophonor</em></h1>
+
+<p align="center">
+  <b>Breathe into an EWI or Aerophone, and paint with sound.</b><br>
+  <sub>Real winds that follow your breath&nbsp;·&nbsp;four ways to see the music&nbsp;·&nbsp;native on Arch Linux and Omarchy</sub>
+</p>
+
+<p align="center">
+  <a href="#run-it">Install</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#plug-in-a-wind-controller">Sensors</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#instruments">Voices</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="#visuals">Visuals</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="docs/">The page</a>
+</p>
+
+<br>
 
 A sheet of raw xuan paper fills the window. Plug in an EWI or Aerophone and
-it's found straight away. Breathe, and the instrument sounds while a brush writes the
-melody across the sheet. You choose the instrument at the top left and how
-the music is drawn at the top right. That's all the interface there is.
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ SIGNATURE                                                     VISUAL │
-│ Holophonor ⌄                                                  ⌄ Sumi │
-│                                                                      │
-│                          ╭─╮                                         │
-│            ╭──╮        ╭─╯ ╰──╮                                      │
-│   ━━━━━━━━╯  ╰──    ━━╯      ╰━━━━            ▣  ← the seal, once a  │
-│                                                    phrase settles    │
-│                                                                      │
-│ A4  +03¢  ━━━━━━──  breath · cc2                    ● EWI USB        │
-└──────────────────────────────────────────────────────────────────────┘
-```
+it's found straight away. Breathe, and the instrument sounds while a brush
+writes the melody across the sheet. The instrument is at the top left and
+how the music is drawn is at the top right. That's all the interface there is.
 
 Built for Arch Linux and Omarchy: C++ and Qt Quick, PipeWire for sound, the
 ALSA sequencer for MIDI, and the Omarchy theme for its colours.
+
+The project page lives in [`docs/`](docs/). Open `docs/index.html` in a
+browser, or serve the folder with any static host.
 
 ## Run it
 
@@ -82,6 +84,17 @@ Keyboard notes are polyphonic and use an envelope, and they still play while
 an EWI is connected.
 
 ## Visuals
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/sumi.webp" alt="Sumi: an ink brush writes the melody"></td>
+    <td width="50%"><img src="docs/images/bloom.webp" alt="Bloom: watercolour pools of pigment"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/images/graphite.webp" alt="Graphite: an engraved score line"></td>
+    <td width="50%"><img src="docs/images/projection.webp" alt="Projection: a gold harmonograph"></td>
+  </tr>
+</table>
 
 | Key | Mode       | What it draws                                                              |
 |-----|------------|----------------------------------------------------------------------------|
@@ -192,6 +205,10 @@ holophonor [--instrument <id>] [--visual sumi|bloom|graphite|projection]
 - `src/inkpainter.*` and `src/paper.*` hold the four visual modes and the
   generated paper.
 - `src/*.qml` is the window, the two menus and the shortcut card.
+- `docs/` is the project page: static HTML, CSS and one script, with no build
+  step. The paper, the brush and the projection are browser ports of
+  `paper.cpp` and `inkpainter.cpp`. `?poster` draws every animation finished,
+  for stills and reduced motion.
 
 ## Tests
 
