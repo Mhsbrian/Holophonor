@@ -1,0 +1,20 @@
+[package]
+name = "holophonor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+description = "An expressive wind instrument and a living canvas"
+license = "MIT"
+repository = "https://github.com/Mhsbrian/Holophonor"
+
+[dependencies]
+cpal = "0.18.2"
+eframe = { version = "0.36.2", default-features = false, features = ["accesskit", "default_fonts", "glow", "persistence", "wayland", "x11"] }
+midir = "0.11.1"
+png = "0.18"
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
