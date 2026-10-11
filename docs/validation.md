@@ -13,6 +13,7 @@ Checked on October 11, 2026, on x86_64 Arch/Omarchy, Rust 1.98, Hyprland 0.56.2,
 | Local audio integration | Pass: silent stream, 48,000 Hz, actual 256-frame callbacks, 188 callbacks in a one-second test, zero reported stream errors |
 | Native interface | Visually inspected captures of idle, playing, both menus, connections, and 760 × 560 layout; Tab/Enter opens both selectors |
 | Desktop entry | `desktop-file-validate` passes; shell scripts and PKGBUILD pass `bash -n` |
+| Arch package | `bin/package --nodeps` produces the installable x86_64 package and passes release tests; dependency checks were bypassed because Rust is managed by rustup here, with required system libraries checked separately |
 | License inventory | `cargo about generate --locked --offline --fail --format json` succeeds for Linux; full notices retained in `THIRD_PARTY_LICENSES.md` |
 | Offline synthesis | 12 seconds of stereo PCM rendered in 35.19 ms in one release run, including PCM conversion: 0.29% of real time |
 | Sound sample | Valid 48 kHz / 16-bit / stereo WAV; all four sections nonzero; overall peak 0.2183, no PCM clipping |

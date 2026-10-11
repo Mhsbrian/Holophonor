@@ -7,6 +7,7 @@ url='https://github.com/Mhsbrian/Holophonor'
 license=('MIT')
 depends=('alsa-lib' 'libglvnd' 'libxkbcommon' 'wayland' 'libx11' 'libxcursor' 'libxi' 'libxrandr')
 makedepends=('cargo' 'pkgconf' 'gcc')
+options=('!debug' '!strip')
 source=("$pkgname-$pkgver.tar.gz")
 sha256sums=("${HOLOPHONOR_SOURCE_SHA256:?Build this local source package with bin/package}")
 
