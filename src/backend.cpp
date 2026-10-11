@@ -207,9 +207,10 @@ void Backend::panic()
     m_synth->pushUi(ControlEvent::allNotesOff(ControlEvent::Keys));
 }
 
-// A short phrase in D dorian, sent the way an EWI sends it: breath as a
-// continuous controller, legato notes overlapping by a few milliseconds, and
-// one entrance scooped up from a semitone below.
+// A short performance sent the way a wind controller sends it (modelled on
+// the Roland Aerophone): breath on CC2 every 5 ms, velocity taken from the
+// breath at the attack, tongued notes that break the breath, slurs that
+// don't, and vibrato from the bite sensor as downward-only pitch bend.
 void Backend::playDemo()
 {
     if (m_demoTimer.isActive())
@@ -217,15 +218,25 @@ void Backend::playDemo()
     struct Note {
         int pitch;
         double start, end;
+        bool slurred; // carried on the same breath from the note before
+        double vibrato; // bite vibrato depth in semitones, 0 for none
     };
     struct Phrase {
         QVector<Note> notes;
         double peak;
     };
     const Phrase phrases[] = {
-        {{{62, 0.0, 1.1}, {65, 1.1, 1.6}, {67, 1.6, 2.2}, {69, 2.2, 3.6}}, 0.78},
-        {{{72, 4.2, 4.9}, {69, 4.9, 5.4}, {67, 5.4, 6.0}, {64, 6.0, 6.5}, {62, 6.5, 8.2}}, 0.85},
-        {{{69, 9.0, 9.5}, {74, 9.5, 10.3}, {76, 10.3, 10.8}, {77, 10.8, 11.3}, {76, 11.3, 11.8}, {74, 11.8, 13.8}},
+        // A lyrical line with a wide slurred leap and a long, vibrato-ed end.
+        {{{62, 0.0, 0.7, false, 0}, {74, 0.7, 1.25, true, 0}, {72, 1.25, 1.55, true, 0}, {69, 1.55, 1.85, true, 0},
+          {67, 1.85, 2.15, true, 0}, {69, 2.15, 3.9, true, 0.22}},
+         0.8},
+        // Tongued: each note is its own breath, the last one sung out.
+        {{{76, 4.4, 4.62, false, 0}, {76, 4.7, 4.92, false, 0}, {74, 5.0, 5.22, false, 0}, {72, 5.3, 5.52, false, 0},
+          {69, 5.6, 5.95, false, 0}, {67, 6.05, 7.9, false, 0.25}},
+         0.85},
+        // Two-octave slur up and back down, no glide in between.
+        {{{57, 8.4, 9.0, false, 0}, {69, 9.0, 9.4, true, 0}, {81, 9.4, 10.6, true, 0.18}, {74, 10.6, 11.0, true, 0},
+          {62, 11.0, 13.0, true, 0.2}},
          0.9},
     };
 
@@ -233,23 +244,49 @@ void Backend::playDemo()
     auto cue = [this](double at, const ControlEvent &event) { m_demo.append({at, event}); };
     for (const Phrase &phrase : phrases) {
         const double start = phrase.notes.first().start, end = phrase.notes.last().end;
-        for (double t = start; t <= end; t += 0.012) {
+        auto breathAt = [&](double t) {
             const double u = (t - start) / (end - start);
-            double breath = phrase.peak * (0.72 + 0.28 * std::sin(M_PI * u));
-            breath *= std::min(1.0, (t - start) / 0.12);
-            breath *= std::clamp((end - t) / 0.45, 0.0, 1.0);
-            cue(t, ControlEvent::controller(2, int(std::lround(breath * 127.0))));
-        }
+            double breath = phrase.peak * (0.7 + 0.3 * std::sin(M_PI * u));
+            breath *= std::min(1.0, (t - start) / 0.035);
+            breath *= std::clamp((end - t) / 0.3, 0.0, 1.0);
+            // The tongue stops the air between tongued notes.
+            for (int i = 1; i < phrase.notes.size(); ++i) {
+                const Note &note = phrase.notes[i];
+                if (note.slurred)
+                    continue;
+                const double gapStart = phrase.notes[i - 1].end, gapEnd = note.start;
+                if (t > gapStart - 0.01 && t < gapEnd + 0.03)
+                    breath *= t < gapEnd ? 0.0 : std::clamp((t - gapEnd) / 0.03, 0.0, 1.0);
+            }
+            return std::clamp(breath, 0.0, 1.0);
+        };
+        for (double t = start; t <= end; t += 0.005)
+            cue(t, ControlEvent::controller(2, int(std::lround(breathAt(t) * 127.0))));
         cue(end + 0.02, ControlEvent::controller(2, 0));
+
         for (int i = 0; i < phrase.notes.size(); ++i) {
             const Note &note = phrase.notes[i];
-            const bool last = i == phrase.notes.size() - 1;
-            cue(note.start + (i == 0 ? 0.02 : 0.0), ControlEvent::noteOn(note.pitch, 90));
-            cue(note.end + (last ? 0.03 : 0.008), ControlEvent::noteOff(note.pitch));
+            const int velocity = std::max(1, int(std::lround(breathAt(note.start + 0.02) * 127.0)));
+            const bool slurredOut = i + 1 < phrase.notes.size() && phrase.notes[i + 1].slurred;
+            if (note.slurred) {
+                // New fingering first, then the old note lets go: legato.
+                cue(note.start, ControlEvent::noteOn(note.pitch, velocity));
+                cue(note.start + 0.004, ControlEvent::noteOff(phrase.notes[i - 1].pitch));
+            } else {
+                cue(note.start + 0.004, ControlEvent::noteOn(note.pitch, velocity));
+            }
+            if (!slurredOut)
+                cue(note.end, ControlEvent::noteOff(note.pitch));
+            if (note.vibrato > 0.0) {
+                for (double t = note.start + 0.35; t < note.end; t += 0.005) {
+                    const double ramp = std::min(1.0, (t - note.start - 0.35) / 0.5);
+                    const double down = note.vibrato * ramp * (0.5 - 0.5 * std::cos(2.0 * M_PI * 5.2 * (t - note.start - 0.35)));
+                    cue(t, ControlEvent::pitchBend(int(-down / Synth::kBendRange * 8192.0)));
+                }
+                cue(note.end, ControlEvent::pitchBend(0));
+            }
         }
     }
-    for (int k = 0; k <= 10; ++k)
-        cue(4.2 + k * 0.015, ControlEvent::pitchBend(int(-4096 * (1.0 - k / 10.0))));
     std::stable_sort(m_demo.begin(), m_demo.end(), [](const Cue &a, const Cue &b) { return a.at < b.at; });
 
     m_demoNext = 0;

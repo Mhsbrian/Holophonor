@@ -56,9 +56,11 @@ void MidiInput::stop()
 
 bool MidiInput::looksLikeEwi(const QString &name)
 {
-    // "EWI USB", "EWI5000", "EWI Solo", "EWI-USB": EWI at the start of a word.
-    static const QRegularExpression ewi(QStringLiteral("(^|[^a-z])ewi"), QRegularExpression::CaseInsensitiveOption);
-    return ewi.match(name).hasMatch();
+    // Wind controllers by name: Akai's "EWI USB", "EWI5000", "EWI Solo", and
+    // Roland's Aerophones ("AE-10", "AE-20", "AE-30", "Aerophone ...").
+    static const QRegularExpression wind(QStringLiteral("(^|[^a-z])(ewi|aerophone|ae-\\d\\d)"),
+                                         QRegularExpression::CaseInsensitiveOption);
+    return wind.match(name).hasMatch();
 }
 
 bool MidiInput::shouldAutoConnect(const MidiPort &port, int ownClient)

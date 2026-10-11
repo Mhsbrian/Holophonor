@@ -17,6 +17,8 @@
 #include "instruments.h"
 #include "midiinput.h"
 #include "paper.h"
+#include "profile.h"
+#include "profiles.h"
 #include "synth.h"
 #include "theme.h"
 
@@ -45,9 +47,13 @@ float rms(const std::vector<float> &x, size_t from = 0)
 
 // YIN (de Cheveigné & Kawahara, 2002): cumulative mean normalised difference,
 // first dip under the threshold, parabolic refinement.
-float pitchOf(const std::vector<float> &x, size_t start, int window = 2048)
+float pitchOf(const std::vector<float> &x, size_t start, int window = 2048, float expected = 0.0f)
 {
-    const int minLag = int(kRate / 2500), maxLag = int(kRate / 40);
+    // Given an expected pitch, look only within a third of an octave of it:
+    // the question is tuning, and a bassoon's weak fundamental would
+    // otherwise tempt the estimator up an octave.
+    const int minLag = expected > 0.0f ? int(kRate / (expected * 1.26f)) : int(kRate / 2500);
+    const int maxLag = expected > 0.0f ? int(kRate / (expected / 1.26f)) : int(kRate / 40);
     std::vector<double> d(size_t(maxLag) + 2, 0.0), cmnd(size_t(maxLag) + 2, 1.0);
     double running = 0.0;
     for (int tau = 1; tau <= maxLag + 1; ++tau) {
@@ -118,6 +124,8 @@ private slots:
         // Keep QSettings away from the real ~/.config.
         QVERIFY(m_config.isValid());
         qputenv("XDG_CONFIG_HOME", m_config.path().toLocal8Bit());
+        const QStringList missing = profiles::load();
+        QVERIFY2(missing.isEmpty(), qPrintable("missing profiles: " + missing.join(", ")));
     }
 
     // --- Synth -------------------------------------------------------------
@@ -172,7 +180,7 @@ private slots:
         const auto out = render(*synth, 0.4);
         // A sub-octave oscillator makes the true period twice as long.
         const float expected = dsp::midiToHz(float(note + p.transpose)) / (p.sub > 0.0f ? 2.0f : 1.0f);
-        const float measured = pitchOf(out, size_t(0.25 * kRate));
+        const float measured = pitchOf(out, size_t(0.25 * kRate), 2048, expected);
         QVERIFY2(std::fabs(centsBetween(measured, expected)) < 12.0f,
                  qPrintable(QString("expected %1 Hz, measured %2 Hz").arg(expected).arg(measured)));
     }
@@ -279,6 +287,149 @@ private slots:
         QVERIFY(!synth->snapshot().sounding);
     }
 
+    // --- Wind-controller playing -------------------------------------------
+
+    // A slur (same breath, new fingering) must land on the new pitch at once:
+    // a wide leap that glides sounds like a sci-fi sweep, not an instrument.
+    void slursJumpWithoutGlide_data()
+    {
+        QTest::addColumn<QString>("preset");
+        for (const char *id : {"alto-sax", "flute", "trumpet", "holophonor", "violin"})
+            QTest::newRow(id) << QString(id);
+    }
+
+    void slursJumpWithoutGlide()
+    {
+        QFETCH(QString, preset);
+        auto synth = synthWith(preset.toStdString());
+        synth->handle(ControlEvent::controller(2, 100));
+        synth->handle(ControlEvent::noteOn(62, 100));
+        render(*synth, 0.3);
+        synth->handle(ControlEvent::noteOn(81, 100)); // new fingering first...
+        synth->handle(ControlEvent::noteOff(62));     // ...then the old one lets go
+        render(*synth, 0.01);
+        QVERIFY2(std::fabs(synth->snapshot().pitch - 81.0f) < 0.05f,
+                 qPrintable(QString("pitch %1 after 10 ms").arg(synth->snapshot().pitch)));
+    }
+
+    void portamentoGlidesOnlyWhenAsked()
+    {
+        auto synth = synthWith("alto-sax");
+        synth->handle(ControlEvent::controller(65, 127)); // portamento on
+        synth->handle(ControlEvent::controller(5, 64));   // about 150 ms
+        synth->handle(ControlEvent::controller(2, 100));
+        synth->handle(ControlEvent::noteOn(62, 100));
+        render(*synth, 0.3);
+        synth->handle(ControlEvent::noteOn(74, 100));
+        synth->handle(ControlEvent::noteOff(62));
+        render(*synth, 0.01);
+        const float during = synth->snapshot().pitch;
+        QVERIFY2(during > 62.2f && during < 73.5f, qPrintable(QString("pitch %1").arg(during)));
+        render(*synth, 1.5);
+        QVERIFY(std::fabs(synth->snapshot().pitch - 74.0f) < 0.05f);
+    }
+
+    // The player's bite sensor makes the vibrato; the synth must not add its own.
+    void breathPlayersGetNoAutomaticVibrato()
+    {
+        auto synth = synthWith("alto-sax");
+        synth->setVibratoScale(1.0f);
+        synth->handle(ControlEvent::controller(2, 100));
+        synth->handle(ControlEvent::noteOn(67, 100));
+        float lowest = 99.0f, highest = 0.0f;
+        for (int i = 0; i < 40; ++i) {
+            render(*synth, 0.05);
+            lowest = std::min(lowest, synth->snapshot().pitch);
+            highest = std::max(highest, synth->snapshot().pitch);
+        }
+        QVERIFY2(highest - lowest < 0.01f, qPrintable(QString("pitch wandered %1").arg(highest - lowest)));
+
+        auto keys = synthWith("alto-sax");
+        keys->setVibratoScale(1.0f);
+        keys->handle(ControlEvent::noteOn(67, 100, ControlEvent::Keys));
+        lowest = 99.0f, highest = 0.0f;
+        for (int i = 0; i < 40; ++i) {
+            render(*keys, 0.05);
+            lowest = std::min(lowest, keys->snapshot().pitch);
+            highest = std::max(highest, keys->snapshot().pitch);
+        }
+        QVERIFY(highest - lowest > 0.05f); // keys still get a natural, delayed vibrato
+    }
+
+    // Tonguing before the breath has risen (velocity is the breath peak on an
+    // Aerophone) must start cleanly, not burst.
+    void tonguedAttackBeforeBreathStaysClean()
+    {
+        auto synth = synthWith("alto-sax");
+        synth->handle(ControlEvent::controller(2, 0));
+        synth->handle(ControlEvent::noteOn(64, 100));
+        std::vector<float> out;
+        for (int step = 0; step <= 10; ++step) {
+            synth->handle(ControlEvent::controller(2, step * 11));
+            const auto part = render(*synth, 0.005);
+            out.insert(out.end(), part.begin(), part.end());
+        }
+        const auto rest = render(*synth, 0.5);
+        out.insert(out.end(), rest.begin(), rest.end());
+        float peak = 0.0f;
+        for (float v : out) {
+            QVERIFY(std::isfinite(v));
+            peak = std::max(peak, std::fabs(v));
+        }
+        QVERIFY2(peak < 0.8f, qPrintable(QString("peak %1").arg(peak)));
+        QVERIFY(rms(out, out.size() / 2) > 0.01f);
+    }
+
+    // Blowing harder brightens a real horn: more energy in the upper harmonics.
+    void breathBrightensMeasuredTones_data()
+    {
+        QTest::addColumn<QString>("preset");
+        for (const char *id : {"alto-sax", "trumpet", "clarinet", "flute"})
+            QTest::newRow(id) << QString(id);
+    }
+
+    void breathBrightensMeasuredTones()
+    {
+        QFETCH(QString, preset);
+        auto brightness = [&](int breath) {
+            auto synth = synthWith(preset.toStdString());
+            synth->handle(ControlEvent::controller(2, breath));
+            synth->handle(ControlEvent::noteOn(67, breath));
+            const auto out = render(*synth, 0.8);
+            double slope = 0.0, energy = 0.0;
+            for (size_t i = size_t(0.4 * kRate); i < out.size(); ++i) {
+                slope += double(out[i] - out[i - 1]) * (out[i] - out[i - 1]);
+                energy += double(out[i]) * out[i];
+            }
+            return slope / energy;
+        };
+        const double soft = brightness(35), loud = brightness(120);
+        QVERIFY2(loud > soft * 1.15, qPrintable(QString("soft %1, loud %2").arg(soft).arg(loud)));
+    }
+
+    void profilesCoverTheirInstruments()
+    {
+        for (const Preset &preset : instruments::catalog()) {
+            if (preset.engine != Engine::Spectral)
+                continue;
+            const auto profile = instruments::profile(preset.profile);
+            QVERIFY2(profile, preset.profile.c_str());
+            QCOMPARE(int(profile->tones.size()), (profile->highNote - profile->lowNote + 1) * Profile::kDynamics);
+            for (const ProfileTone &tone : profile->tones) {
+                QVERIFY(tone.f0 > 20.0f);
+                QVERIFY(!tone.harmonics.empty());
+                QVERIFY(!tone.attack.empty());
+            }
+        }
+        // The format round-trips.
+        const auto alto = instruments::profile("alto-sax");
+        const std::vector<uint8_t> bytes = alto->serialize();
+        const auto again = Profile::parse(bytes.data(), bytes.size());
+        QVERIFY(again);
+        QCOMPARE(again->serialize(), bytes);
+        QVERIFY(!Profile::parse(bytes.data(), bytes.size() / 2)); // truncated
+    }
+
     // --- Catalog and search ------------------------------------------------
 
     void catalogIdsAreUnique()
@@ -298,8 +449,8 @@ private slots:
         QCOMPARE(model.count(), int(instruments::catalog().size()));
 
         model.setQuery("sax");
-        QCOMPARE(model.count(), 2);
-        QCOMPARE(model.data(model.index(0), InstrumentModel::NameRole).toString(), QString("Alto Sax"));
+        QCOMPARE(model.count(), 4);
+        QCOMPARE(model.data(model.index(0), InstrumentModel::NameRole).toString(), QString("Soprano Sax"));
 
         model.setQuery("brass");
         QCOMPARE(model.count(), 3);
@@ -322,6 +473,9 @@ private slots:
         QVERIFY(MidiInput::looksLikeEwi("EWI USB"));
         QVERIFY(MidiInput::looksLikeEwi("EWI5000 MIDI 1"));
         QVERIFY(MidiInput::looksLikeEwi("Akai EWI-Solo"));
+        QVERIFY(MidiInput::looksLikeEwi("AE-10"));
+        QVERIFY(MidiInput::looksLikeEwi("Roland Aerophone AE-30 MIDI 1"));
+        QVERIFY(MidiInput::looksLikeEwi("Aerophone GO"));
         QVERIFY(!MidiInput::looksLikeEwi("Newick Synth"));
     }
 

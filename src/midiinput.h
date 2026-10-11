@@ -1,6 +1,7 @@
 // Finds MIDI controllers through the ALSA sequencer and keeps finding them:
 // it subscribes to the sequencer's announce port, so an EWI plugged in while
 // the app runs is connected the moment the kernel creates its port.
+// "EWI" below means any wind controller: Akai EWI or Roland Aerophone.
 #pragma once
 
 #include <QHash>

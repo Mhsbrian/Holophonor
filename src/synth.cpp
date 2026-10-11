@@ -33,8 +33,10 @@ float readFractional(const float *line, int size, float position)
 Synth::Synth(float sampleRate)
     : m_sampleRate(sampleRate), m_requestedPreset(instruments::defaultIndex()), m_reverb(sampleRate)
 {
-    for (size_t i = 0; i < m_voices.size(); ++i)
+    for (size_t i = 0; i < m_voices.size(); ++i) {
         m_voices[i].noise.state = 0x9E3779B9u * uint32_t(i + 1);
+        m_voices[i].spectral.setSampleRate(sampleRate);
+    }
     applyPreset();
 }
 
@@ -94,8 +96,9 @@ void Synth::applyPreset()
     m_lead = -1;
 
     // A player who switches instruments mid-phrase keeps sounding.
-    if (m_breathSource != NoBreath && m_stackSize > 0 && m_preset->engine == Engine::Wind)
-        articulateLead(m_stack[m_stackSize - 1], false);
+    if (m_breathSource != NoBreath && m_stackSize > 0 &&
+        (m_preset->engine == Engine::Wind || m_preset->engine == Engine::Spectral))
+        articulateLead(m_stack[m_stackSize - 1], false, 1.0f, false);
 }
 
 void Synth::handle(const ControlEvent &event)
@@ -117,6 +120,12 @@ void Synth::handle(const ControlEvent &event)
             break;
         case 2:
             breath(BreathCc2, event.value);
+            break;
+        case 5:
+            m_portamentoTime = 0.6f * std::pow(std::clamp(event.value / 127.0f, 0.0f, 1.0f), 2.0f);
+            break;
+        case 65:
+            m_portamento = event.value >= 64;
             break;
         case 7:
             breath(BreathCc7, event.value);
@@ -178,13 +187,14 @@ bool Synth::breathMode(ControlEvent::Source source)
 
 void Synth::noteOn(int note, int velocity, ControlEvent::Source source)
 {
-    if (m_preset->engine == Engine::Wind && breathMode(source)) {
+    const bool sustained = m_preset->engine == Engine::Wind || m_preset->engine == Engine::Spectral;
+    if (sustained && breathMode(source)) {
         auto end = std::remove(m_stack.begin(), m_stack.begin() + m_stackSize, note);
         m_stackSize = int(end - m_stack.begin());
         if (m_stackSize < int(m_stack.size()))
             m_stack[m_stackSize++] = note;
         const bool legato = m_stackSize > 1 && m_lead >= 0 && m_voices[m_lead].active && m_voices[m_lead].held;
-        articulateLead(note, legato);
+        articulateLead(note, legato, velocity / 127.0f);
         return;
     }
     Voice &voice = allocate(note, source);
@@ -235,22 +245,36 @@ void Synth::release(Voice &voice)
     voice.sustained = false;
 }
 
-void Synth::articulateLead(int note, bool legato)
+void Synth::articulateLead(int note, bool legato, float velocity, bool tongued)
 {
     if (legato && m_lead >= 0) {
+        // A slur: the same breath, a new fingering. The pitch moves at once
+        // (glide only if the player turned portamento on); a measured
+        // instrument also gets the bore's brief settling into the new note.
         Voice &lead = m_voices[m_lead];
         lead.note = note;
         lead.target = float(note + lead.preset->transpose);
         lead.held = true;
+        if (lead.preset->engine == Engine::Spectral)
+            lead.spectral.slur(note + lead.preset->transpose);
     } else {
         Voice *lead = nullptr;
-        if (m_lead >= 0 && m_voices[m_lead].active && !m_voices[m_lead].killed) {
+        const bool measured = m_preset->engine == Engine::Spectral;
+        if (!measured && m_lead >= 0 && m_voices[m_lead].active && !m_voices[m_lead].killed) {
             // The previous note is still ringing out: re-articulate it so the
             // tail flows into the new note instead of cutting.
             lead = &m_voices[m_lead];
         } else {
+            // A tongued note on a measured instrument stops the previous tone
+            // the way the tongue stops the reed, then starts with a real attack.
+            if (measured && m_lead >= 0 && m_voices[m_lead].active) {
+                Voice &previous = m_voices[m_lead];
+                previous.killed = true;
+                previous.held = previous.lead = false;
+            }
+            m_lead = -1;
             lead = &allocate(note, ControlEvent::Midi);
-            start(*lead, note, 1.0f, ControlEvent::Midi);
+            start(*lead, note, velocity, ControlEvent::Midi, tongued);
             m_lead = int(lead - m_voices.data());
         }
         lead->lead = true;
@@ -293,7 +317,9 @@ Synth::Voice &Synth::allocate(int note, ControlEvent::Source source)
     return *best;
 }
 
-void Synth::start(Voice &voice, int note, float velocity, ControlEvent::Source source)
+float Synth::glideTime(const Preset &preset) const { return m_portamento ? m_portamentoTime : preset.portamento; }
+
+void Synth::start(Voice &voice, int note, float velocity, ControlEvent::Source source, bool tongued)
 {
     const Preset &p = *m_preset;
     const bool continuing = voice.active && voice.preset == &p && p.engine == Engine::Wind;
@@ -332,7 +358,68 @@ void Synth::start(Voice &voice, int note, float velocity, ControlEvent::Source s
         voice.carrier.phase = voice.modulator.phase = 0.0f;
         voice.exciteLeft = int(0.002f * m_sampleRate); // attack, in samples
         voice.env = 0.0f;
+    } else if (p.engine == Engine::Spectral) {
+        // How hard the note is attacked. Wind controllers send velocity from
+        // the breath at the moment of tonguing (the Aerophone sends the CC2
+        // peak), so it is the better measure than breath, which may still be
+        // rising; from the keys, velocity is all there is.
+        const bool breathing = source == ControlEvent::Midi && m_breathSource != NoBreath;
+        const float drive = breathing ? std::max(m_breathTarget, voice.velocity) : 0.35f + 0.65f * voice.velocity;
+        voice.env = 0.0f;
+        voice.spectral.start(instruments::profile(p.profile), p.profileShift, note + p.transpose, voice.velocity,
+                             drive, tongued);
     }
+}
+
+float Synth::renderSpectral(Voice &v, const float *breath, const float *bend, float *dry, float *reverb,
+                            float *chorus, int n)
+{
+    const Preset &p = *v.preset;
+    const float sr = m_sampleRate;
+    const float glide = dsp::smoothing(glideTime(p), sr);
+    // The recorded attack shapes the onset, so the gate itself opens at once.
+    const float attack = dsp::smoothing(0.002f, sr);
+    const float fall = dsp::smoothing(v.killed ? kKillTime : p.release / 3.0f, sr);
+    // A breath player makes their own vibrato with the bite sensor (it
+    // arrives as pitch bend); only keyboard notes get the preset's, delayed.
+    const float delayRamp = std::clamp((v.age - p.vibratoDelay) / 0.4f, 0.0f, 1.0f);
+    const float automatic = v.lead ? 0.0f : p.vibratoDepth * delayRamp * m_vibratoScale.load(std::memory_order_relaxed);
+    const float depth = automatic + m_modWheel * 0.5f;
+    const float vibratoDt = p.vibratoRate / sr;
+
+    float drive[32] = {}, pitch[32] = {}, out[32] = {};
+    float peak = 0.0f;
+    for (int i = 0; i < n; ++i) {
+        v.pitch += (v.target - v.pitch) * glide;
+        const float phase = v.vibrato.step(vibratoDt);
+        v.vibratoNow = depth != 0.0f ? dsp::sine(phase) * depth : 0.0f;
+        const float gate = (v.held || v.sustained) && !v.killed ? 1.0f : 0.0f;
+        v.env += (gate - v.env) * (gate > v.env ? attack : fall);
+        if (v.killed)
+            v.drive *= 1.0f - fall;
+        else
+            v.drive = v.lead ? breath[i] * v.env : v.env * (0.35f + 0.65f * v.velocity);
+        // Vibrato is never pitch alone: the tone swells and darkens with it.
+        drive[i] = v.drive * (1.0f + 0.25f * v.vibratoNow);
+        pitch[i] = v.pitch + bend[i] + v.vibratoNow;
+        peak = std::max(peak, v.drive);
+    }
+    v.spectral.render(out, n, drive, pitch);
+    for (int i = 0; i < n; ++i) {
+        const float sample = out[i] * p.level;
+        dry[i] += sample;
+        reverb[i] += sample * p.reverb;
+        chorus[i] += sample * p.chorus;
+    }
+    v.age += float(n) / sr;
+
+    const bool silent = !v.spectral.active() || (v.killed && v.drive < 1e-4f);
+    if (!v.held && !v.sustained && v.env < 1e-4f && silent) {
+        v.active = false;
+        if (int(&v - m_voices.data()) == m_lead)
+            m_lead = -1;
+    }
+    return peak;
 }
 
 float Synth::renderWind(Voice &v, const float *breath, const float *bend, float *dry, float *reverb, float *chorus,
@@ -340,11 +427,13 @@ float Synth::renderWind(Voice &v, const float *breath, const float *bend, float 
 {
     const Preset &p = *v.preset;
     const float sr = m_sampleRate;
-    const float glide = dsp::smoothing(p.glide, sr);
+    const float glide = dsp::smoothing(glideTime(p), sr);
     const float attack = dsp::smoothing(v.lead ? 0.004f : p.attack, sr);
     const float fall = dsp::smoothing(v.killed ? kKillTime : p.release / 3.0f, sr);
     const float delayRamp = std::clamp((v.age - p.vibratoDelay) / 0.4f, 0.0f, 1.0f);
-    const float depth = p.vibratoDepth * delayRamp * m_vibratoScale.load(std::memory_order_relaxed) + m_modWheel * 0.5f;
+    // Breath players bring their own vibrato through the bite sensor.
+    const float automatic = v.lead ? 0.0f : p.vibratoDepth * delayRamp * m_vibratoScale.load(std::memory_order_relaxed);
+    const float depth = automatic + m_modWheel * 0.5f;
     const float vibratoDt = p.vibratoRate / sr;
     const float detune = std::exp2(p.detuneCents / 1200.0f);
 
@@ -514,6 +603,9 @@ void Synth::renderBlock(float *out, int n)
         if (!voice.active)
             continue;
         switch (voice.preset->engine) {
+        case Engine::Spectral:
+            renderSpectral(voice, breath, bend, dry, reverb, chorus, n);
+            break;
         case Engine::Wind:
             renderWind(voice, breath, bend, dry, reverb, chorus, n);
             break;

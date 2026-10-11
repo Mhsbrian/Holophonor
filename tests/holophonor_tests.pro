@@ -16,7 +16,10 @@ HEADERS += \
     ../src/instruments.h \
     ../src/midiinput.h \
     ../src/paper.h \
+    ../src/profile.h \
+    ../src/profiles.h \
     ../src/reverb.h \
+    ../src/spectral.h \
     ../src/synth.h \
     ../src/theme.h
 
@@ -29,6 +32,11 @@ SOURCES += \
     ../src/instruments.cpp \
     ../src/midiinput.cpp \
     ../src/paper.cpp \
+    ../src/profile.cpp \
+    ../src/profiles.cpp \
     ../src/reverb.cpp \
+    ../src/spectral.cpp \
     ../src/synth.cpp \
     ../src/theme.cpp
+
+RESOURCES += ../data/profiles.qrc

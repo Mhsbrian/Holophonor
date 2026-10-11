@@ -1,13 +1,18 @@
 // The instrument catalog. Each preset is a small set of numbers for one of
-// three voice engines; none of them load samples, so the whole catalog ships
-// inside the binary and every voice responds continuously to breath.
+// four voice engines. The acoustic winds play profiles measured from real
+// recordings (Spectral); the rest are modelled. Every voice responds
+// continuously to breath.
 #pragma once
 
 #include <array>
+#include <memory>
 #include <string>
 #include <vector>
 
+struct Profile;
+
 enum class Engine {
+    Spectral, // a real instrument's measured harmonics and breath noise (src/spectral.h)
     Wind,  // band-limited oscillators, breath noise, breath-driven filter and formants
     Pluck, // Karplus–Strong string
     Fm,    // two-operator FM for keys and mallets
@@ -26,8 +31,10 @@ struct Preset {
     std::string tags;
     Engine engine = Engine::Wind;
 
-    int transpose = 0;   // semitones added to the played note
-    float glide = 0.03f; // legato portamento, seconds
+    int transpose = 0;        // semitones added to the played note
+    float portamento = 0.0f;  // seconds; only instruments that glide by nature
+    std::string profile;      // Spectral: the measured profile this voice plays
+    int profileShift = 0;     // Spectral: play a bigger instrument of the family
 
     // Wind oscillators, as mix levels.
     float saw = 0.0f, pulse = 0.0f, pulseWidth = 0.5f, sine = 0.0f, sub = 0.0f;
@@ -57,5 +64,10 @@ namespace instruments {
 const std::vector<Preset> &catalog();
 int indexOf(const std::string &id); // -1 when unknown
 int defaultIndex();
+
+// Profiles are attached once at startup, before audio runs, and only read
+// afterwards, so the audio thread can look them up without locking.
+void attachProfile(const std::string &id, std::shared_ptr<const Profile> profile);
+std::shared_ptr<const Profile> profile(const std::string &id);
 
 } // namespace instruments

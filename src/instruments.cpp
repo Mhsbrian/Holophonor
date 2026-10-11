@@ -1,6 +1,9 @@
 #include "instruments.h"
 
 #include <functional>
+#include <map>
+
+#include "profile.h"
 
 namespace {
 
@@ -34,78 +37,55 @@ std::vector<Preset> build()
                          p.reverb = 0.55f, p.chorus = 0.35f;
                      }));
 
-    c.push_back(make("oboe", "Oboe", "Woodwind", "double reed orchestral nasal", Engine::Wind, [](Preset &p) {
-        p.pulse = 0.7f, p.pulseWidth = 0.18f, p.saw = 0.3f;
-        p.cutoff = 2.5f, p.breathCutoff = 10.0f, p.resonance = 0.9f;
-        p.formants = {{{1150, 1.2f, 6}, {2900, 0.6f, 7}, {4200, 0.25f, 8}}};
-        p.formantMix = 0.55f;
-        p.vibratoRate = 5.5f, p.vibratoDepth = 0.1f, p.vibratoDelay = 0.4f;
-        p.level = 0.65f, p.reverb = 0.25f;
-    }));
-    c.push_back(make("clarinet", "Clarinet", "Woodwind", "single reed orchestral jazz hollow", Engine::Wind,
-                     [](Preset &p) {
-                         p.pulse = 1.0f, p.pulseWidth = 0.5f, p.sine = 0.2f;
-                         p.cutoff = 2.0f, p.breathCutoff = 7.0f, p.resonance = 0.75f;
-                         p.noise = 0.03f, p.noiseCenter = 3.0f;
-                         p.vibratoDepth = 0.0f, p.level = 0.15f, p.reverb = 0.22f;
+    // The acoustic winds play profiles measured from the University of Iowa
+    // Musical Instrument Samples (see tools/profile). They sound exactly the
+    // note they receive: wind controllers send concert pitch and players set
+    // octave and transposition on the instrument. Vibrato here is only for
+    // the computer keys; a breath player brings their own with the bite.
+    auto measured = [](const char *profile, float vibrato, float reverb) {
+        return [=](Preset &p) {
+            p.profile = profile;
+            p.vibratoRate = 5.3f, p.vibratoDepth = vibrato, p.vibratoDelay = 0.45f;
+            p.release = 0.08f, p.level = 0.35f, p.reverb = reverb;
+        };
+    };
+    c.push_back(make("soprano-sax", "Soprano Sax", "Woodwind", "saxophone reed jazz bright straight", Engine::Spectral,
+                     measured("soprano-sax", 0.12f, 0.2f)));
+    c.push_back(make("alto-sax", "Alto Sax", "Woodwind", "saxophone reed jazz smooth", Engine::Spectral,
+                     measured("alto-sax", 0.12f, 0.2f)));
+    // Tenor and baritone are built from the alto recordings, played as
+    // instruments a fifth and an octave larger: the resonances move down too.
+    c.push_back(make("tenor-sax", "Tenor Sax", "Woodwind", "saxophone reed jazz breathy warm", Engine::Spectral,
+                     [&](Preset &p) {
+                         measured("alto-sax", 0.13f, 0.2f)(p);
+                         p.profileShift = 7;
                      }));
-    c.push_back(make("flute", "Flute", "Woodwind", "orchestral airy concert", Engine::Wind, [](Preset &p) {
-        p.sine = 0.85f, p.saw = 0.12f;
-        p.cutoff = 2.0f, p.breathCutoff = 4.0f, p.resonance = 0.6f;
-        p.noise = 0.22f, p.noiseCenter = 2.0f, p.noiseQ = 0.8f;
-        p.vibratoRate = 5.0f, p.vibratoDepth = 0.18f, p.vibratoDelay = 0.25f;
-        p.attack = 0.04f, p.level = 0.30f, p.reverb = 0.35f;
-    }));
-    c.push_back(make("alto-sax", "Alto Sax", "Woodwind", "saxophone reed jazz smooth", Engine::Wind,
-                     [](Preset &p) {
-                         p.saw = 0.75f, p.pulse = 0.35f, p.pulseWidth = 0.35f;
-                         p.cutoff = 2.0f, p.breathCutoff = 14.0f, p.resonance = 1.1f;
-                         p.formants = {{{600, 0.8f, 3}, {1700, 0.7f, 4}, {2700, 0.3f, 5}}};
-                         p.formantMix = 0.35f, p.noise = 0.04f;
-                         p.vibratoRate = 5.3f, p.vibratoDepth = 0.12f, p.vibratoDelay = 0.45f;
-                         p.level = 0.85f, p.reverb = 0.3f;
+    c.push_back(make("baritone-sax", "Baritone Sax", "Woodwind", "saxophone reed jazz low bari", Engine::Spectral,
+                     [&](Preset &p) {
+                         measured("alto-sax", 0.1f, 0.18f)(p);
+                         p.profileShift = 12;
                      }));
-    c.push_back(make("tenor-sax", "Tenor Sax", "Woodwind", "saxophone reed jazz breathy warm", Engine::Wind,
-                     [](Preset &p) {
-                         p.transpose = -12;
-                         p.saw = 0.8f, p.pulse = 0.3f, p.pulseWidth = 0.4f;
-                         p.cutoff = 1.8f, p.breathCutoff = 12.0f, p.resonance = 1.0f;
-                         p.formants = {{{500, 0.9f, 3}, {1400, 0.6f, 4}, {2500, 0.25f, 5}}};
-                         p.formantMix = 0.35f, p.noise = 0.06f;
-                         p.vibratoRate = 5.0f, p.vibratoDepth = 0.13f, p.vibratoDelay = 0.45f;
-                         p.level = 0.75f, p.reverb = 0.3f;
-                     }));
-    c.push_back(make("bassoon", "Bassoon", "Woodwind", "double reed orchestral low", Engine::Wind, [](Preset &p) {
-        p.transpose = -12;
-        p.pulse = 0.8f, p.pulseWidth = 0.15f, p.saw = 0.2f;
-        p.cutoff = 2.5f, p.breathCutoff = 6.0f;
-        p.formants = {{{480, 1.0f, 4}, {1150, 0.6f, 5}, {}}};
-        p.formantMix = 0.5f;
-        p.vibratoDepth = 0.06f, p.level = 0.46f, p.reverb = 0.28f;
-    }));
+    c.push_back(make("clarinet", "Clarinet", "Woodwind", "single reed orchestral jazz hollow", Engine::Spectral,
+                     measured("clarinet", 0.0f, 0.22f)));
+    c.push_back(make("flute", "Flute", "Woodwind", "orchestral airy concert", Engine::Spectral,
+                     measured("flute", 0.16f, 0.3f)));
+    c.push_back(make("oboe", "Oboe", "Woodwind", "double reed orchestral nasal", Engine::Spectral,
+                     measured("oboe", 0.1f, 0.25f)));
+    c.push_back(make("bassoon", "Bassoon", "Woodwind", "double reed orchestral low", Engine::Spectral,
+                     measured("bassoon", 0.06f, 0.25f)));
 
-    c.push_back(make("trumpet", "Trumpet", "Brass", "brass bright jazz fanfare", Engine::Wind, [](Preset &p) {
-        p.saw = 1.0f;
-        p.cutoff = 1.2f, p.breathCutoff = 16.0f, p.resonance = 1.0f, p.breathCurve = 1.2f;
-        p.formants = {{{1300, 0.6f, 3}, {2500, 0.4f, 4}, {}}};
-        p.formantMix = 0.25f;
-        p.vibratoRate = 5.6f, p.vibratoDepth = 0.07f, p.vibratoDelay = 0.5f;
-        p.level = 0.36f, p.reverb = 0.28f;
-    }));
-    c.push_back(make("french-horn", "French Horn", "Brass", "brass horn mellow orchestral", Engine::Wind,
-                     [](Preset &p) {
-                         p.transpose = -12;
-                         p.saw = 0.9f, p.sine = 0.2f;
-                         p.cutoff = 1.0f, p.breathCutoff = 5.0f, p.resonance = 0.7f;
-                         p.formants = {{{450, 0.8f, 3}, {}, {}}};
-                         p.formantMix = 0.3f, p.level = 0.54f, p.reverb = 0.5f;
+    c.push_back(make("trumpet", "Trumpet", "Brass", "brass bright jazz fanfare", Engine::Spectral,
+                     measured("trumpet", 0.07f, 0.25f)));
+    c.push_back(make("french-horn", "French Horn", "Brass", "brass horn mellow orchestral", Engine::Spectral,
+                     [&](Preset &p) {
+                         measured("french-horn", 0.0f, 0.4f)(p);
+                         p.level = 0.26f; // a horn's ff is far above its mf
                      }));
-    c.push_back(make("trombone", "Trombone", "Brass", "brass slide low jazz", Engine::Wind, [](Preset &p) {
-        p.transpose = -12, p.glide = 0.09f;
-        p.saw = 1.0f;
-        p.cutoff = 1.0f, p.breathCutoff = 10.0f, p.resonance = 0.9f;
-        p.level = 0.30f, p.reverb = 0.35f;
-    }));
+    c.push_back(make("trombone", "Trombone", "Brass", "brass slide low jazz", Engine::Spectral,
+                     [&](Preset &p) {
+                         measured("trombone", 0.05f, 0.3f)(p);
+                         p.level = 0.28f;
+                     }));
 
     c.push_back(make("violin", "Violin", "Strings", "bowed string orchestral solo", Engine::Wind, [](Preset &p) {
         p.saw = 0.85f, p.detunedSaw = 0.3f, p.detuneCents = 3.0f;
@@ -170,7 +150,7 @@ std::vector<Preset> build()
 
     c.push_back(make("analog-lead", "Analog Lead", "Synth", "synthesizer lead mono saw", Engine::Wind,
                      [](Preset &p) {
-                         p.glide = 0.05f;
+                         p.portamento = 0.05f;
                          p.saw = 0.7f, p.pulse = 0.5f, p.pulseWidth = 0.45f;
                          p.detunedSaw = 0.4f, p.detuneCents = 7.0f;
                          p.cutoff = 1.5f, p.breathCutoff = 18.0f, p.resonance = 2.0f;
@@ -190,7 +170,7 @@ std::vector<Preset> build()
         p.level = 0.37f, p.reverb = 0.1f;
     }));
     c.push_back(make("aether", "Aether", "Synth", "theremin sine eerie glide", Engine::Wind, [](Preset &p) {
-        p.glide = 0.15f;
+        p.portamento = 0.15f;
         p.sine = 1.0f, p.pulse = 0.04f, p.cutoff = 1.5f, p.breathCutoff = 1.0f;
         p.vibratoRate = 6.0f, p.vibratoDepth = 0.3f, p.vibratoDelay = 0.15f;
         p.level = 0.22f, p.reverb = 0.5f;
@@ -253,5 +233,21 @@ int indexOf(const std::string &id)
 }
 
 int defaultIndex() { return indexOf("holophonor"); }
+
+namespace {
+std::map<std::string, std::shared_ptr<const Profile>> &profiles()
+{
+    static std::map<std::string, std::shared_ptr<const Profile>> map;
+    return map;
+}
+} // namespace
+
+void attachProfile(const std::string &id, std::shared_ptr<const Profile> profile) { profiles()[id] = std::move(profile); }
+
+std::shared_ptr<const Profile> profile(const std::string &id)
+{
+    const auto it = profiles().find(id);
+    return it == profiles().end() ? nullptr : it->second;
+}
 
 } // namespace instruments

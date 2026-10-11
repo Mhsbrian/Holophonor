@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/profiles">
+        <file alias="alto-sax.prof">profiles/alto-sax.prof</file>
+        <file alias="bassoon.prof">profiles/bassoon.prof</file>
+        <file alias="clarinet.prof">profiles/clarinet.prof</file>
+        <file alias="flute.prof">profiles/flute.prof</file>
+        <file alias="french-horn.prof">profiles/french-horn.prof</file>
+        <file alias="oboe.prof">profiles/oboe.prof</file>
+        <file alias="soprano-sax.prof">profiles/soprano-sax.prof</file>
+        <file alias="trombone.prof">profiles/trombone.prof</file>
+        <file alias="trumpet.prof">profiles/trumpet.prof</file>
+    </qresource>
+</RCC>

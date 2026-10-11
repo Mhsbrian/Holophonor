@@ -91,7 +91,7 @@ ApplicationWindow {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: backend.device !== "" ? backend.device + " is listening"
-                                        : "Plug in an EWI — or play the keys  A S D F G H J K"
+                                        : "Plug in your EWI or Aerophone — or play the keys  A S D F G H J K"
             font.family: style.mono
             font.pixelSize: 12
             font.letterSpacing: 0.6

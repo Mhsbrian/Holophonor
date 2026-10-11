@@ -2,8 +2,8 @@
 
 Breathe into an EWI and paint with sound.
 
-A sheet of raw xuan paper fills the window. Plug in an EWI and it's found
-straight away. Breathe, and the instrument sounds while a brush writes the
+A sheet of raw xuan paper fills the window. Plug in an EWI or Aerophone and
+it's found straight away. Breathe, and the instrument sounds while a brush writes the
 melody across the sheet. You choose the instrument at the top left and how
 the music is drawn at the top right. That's all the interface there is.
 
@@ -38,24 +38,35 @@ You need `qt6-base`, `qt6-declarative`, `qt6-wayland`, `libpipewire` and
 Display, iA Writer Mono and Noto Serif CJK (for the seal). If one is missing,
 Qt substitutes another font.
 
-## Plug in an EWI
+## Plug in a wind controller
 
 Any class-compliant USB MIDI device is connected as soon as the kernel
-creates its port. That covers the Akai EWI USB, EWI4000s and EWI5000 over USB,
-as well as most keyboards and interfaces. Names containing "EWI" get the
-accent dot and are preferred. You don't need to connect anything by hand.
+creates its port. That covers Roland's Aerophones (the AE-30 shows up as
+`AE-30`), the Akai EWI USB, EWI4000s and EWI5000, and most keyboards and
+interfaces. Wind controllers get the accent dot and are preferred. You don't
+need to connect anything by hand.
 
 Breath is read from **CC2, CC11, CC7 or channel aftertouch**, whichever
-arrives first, because EWIs can be set to send any of them. If notes arrive
-with no breath behind them, the synth falls back to envelopes. That happens
-when the EWI is unplugged and a keyboard takes over.
+arrives first, because controllers can be set to send any of them. An AE-30
+sends CC2 and a shaped copy on CC11; the first one to arrive wins. If notes
+arrive with no breath behind them, the synth falls back to envelopes. That
+happens when the controller is unplugged and a keyboard takes over.
 
-| EWI gesture       | MIDI it sends            | What Holophonor does                        |
-|-------------------|--------------------------|---------------------------------------------|
-| Breath            | CC2 / CC11 / CC7 / AT    | Loudness and brightness, continuously       |
-| Fingering         | Note on / off            | One legato voice, last-note priority, glide |
-| Bend plates       | Pitch bend               | ±2 semitones                                |
-| Bite / mod        | CC1                      | Extra vibrato                               |
+| Gesture           | MIDI it sends            | What Holophonor does                                        |
+|-------------------|--------------------------|-------------------------------------------------------------|
+| Breath            | CC2 / CC11 / CC7 / AT    | Loudness and timbre, continuously, from pp through ff       |
+| Tonguing          | Note on (velocity)       | A new attack. Velocity, the breath at the tongue, picks the recorded soft, normal or accented attack |
+| Slur              | Note on before note off  | The pitch changes at once. No glide, no new attack          |
+| Bite              | Pitch bend               | Vibrato. Pitch, loudness and tone move together             |
+| Bend / joystick   | Pitch bend               | ±2 semitones                                                |
+| Mod               | CC1                      | Adds vibrato depth                                          |
+| Portamento        | CC65 on, CC5 time        | Glides, only when you turn them on                          |
+
+The computer keys get a gentle automatic vibrato. A breath player brings
+their own through the bite sensor, so the synth adds none. On an Aerophone
+the bite only reaches MIDI if the scene's MIDI settings send it: assign Bite
+to pitch bend (a downward bend is fine) or to CC1. The AE-30 these voices
+were tested with sent breath and notes but no bite, so check that setting.
 
 ## Play without one
 
@@ -85,12 +96,25 @@ so they never turn into a smear.
 
 ## Instruments
 
-28 voices, all modelled rather than sampled. Each one responds to breath
-continuously:
+30 voices. Every one responds to breath continuously.
+
+The acoustic winds are **measured from real players**. Each is a profile of a
+real instrument, taken from the University of Iowa Musical Instrument
+Samples: every note at pp, mf and ff. A profile holds the harmonics, the
+breath noise between them, and the first 120 ms of each real tongued attack.
+Playing it:
+
+1. A tongued note starts with that recorded attack.
+2. The sound then hands over, in phase, to resynthesised harmonics.
+3. Breath moves continuously between the recorded pp, mf and ff spectra, so
+   blowing harder brightens the tone the way it does on the real instrument.
+
+Pitch is exact equal temperament. Tenor and baritone are built from the alto
+recordings, played as instruments a fifth and an octave larger.
 
 - **Signature**: Holophonor, an oboe core with glassy upper partials that beat slowly against each other
-- **Woodwind**: Oboe, Clarinet, Flute, Alto Sax, Tenor Sax, Bassoon
-- **Brass**: Trumpet, French Horn, Trombone
+- **Woodwind** (measured): Soprano Sax, Alto Sax, Tenor Sax, Baritone Sax, Clarinet, Flute, Oboe, Bassoon
+- **Brass** (measured): Trumpet, French Horn, Trombone
 - **Strings**: Violin, Cello, String Ensemble
 - **Voice**: Choir Aah, Whistle
 - **World Winds**: Shakuhachi, Pan Flute, Ocarina
@@ -148,8 +172,18 @@ holophonor [--instrument <id>] [--visual sumi|bloom|graphite|projection]
 
 - `src/synth.*` holds the voices, the breath and legato logic, and a chorus and
   Freeverb-style reverb. Nothing on the audio thread locks or allocates.
-- `src/instruments.*` is the catalog: a set of numbers per preset for the Wind,
-  Pluck and FM engines.
+- `src/spectral.*` plays the measured instruments. It handles the recorded
+  attack and phase-aligned hand-over, a bank of harmonics interpolated
+  between the recorded dynamics, breath noise synced to the reed's pulse,
+  and slurs.
+- `src/profile.*` is the profile format. `data/profiles/*.prof` hold the
+  measurements and are compiled into the binary.
+- `tools/profile/` rebuilds them. `build-profiles` downloads the Iowa
+  recordings (free for any use, without restrictions), and `profile.cpp`
+  measures them: it finds each note, its pitch, harmonics, noise and attack,
+  then evens out level across notes.
+- `src/instruments.*` is the catalog: a set of numbers per preset for the
+  Spectral, Wind, Pluck and FM engines.
 - `src/midiinput.*` uses the ALSA sequencer. It subscribes to `System:Announce`
   so hot-plugging works, and its auto-connect policy is kernel clients plus
   anything named EWI.
@@ -161,12 +195,18 @@ holophonor [--instrument <id>] [--visual sumi|bloom|graphite|projection]
 
 ## Tests
 
-`bin/test` runs 109 cases offscreen. It covers:
+`bin/test` runs 128 cases offscreen. It covers:
 
 - Every instrument renders finite, unclipped and audible output.
 - Every harmonic instrument is in tune within 12 cents at A4 and A5 (YIN).
 - Breath shapes loudness, legato falls back to the held note, and pitch bend
   covers ±2 semitones.
+- Slurs reach the new pitch within one block, with no glide. Portamento
+  glides only when CC65 turns it on.
+- Breath players get no automatic vibrato.
+- A note tongued before the breath arrives starts cleanly.
+- Blowing harder brightens every measured instrument.
+- Every profile covers its range and round-trips.
 - Keys play while an EWI is latched, and a silent breath source falls back to
   envelopes.
 - A virtual "EWI Test Rig" hot-plugged on the real ALSA sequencer is

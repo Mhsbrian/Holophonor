@@ -24,3 +24,8 @@ SOFTWARE.
 
 Theme following (src/theme.cpp) and the bin/ build scripts follow Omacut and
 Monologue, MIT License, Copyright (c) David Heinemeier Hansson.
+
+The instrument profiles in data/profiles are measured from the University of
+Iowa Electronic Music Studios' Musical Instrument Samples
+(https://theremin.music.uiowa.edu/MIS.html), which "may be downloaded and used
+for any projects, without restrictions".

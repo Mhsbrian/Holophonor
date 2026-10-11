@@ -15,6 +15,7 @@
 #include "inkpainter.h"
 #include "instrumentmodel.h"
 #include "instruments.h"
+#include "profiles.h"
 #include "theme.h"
 
 namespace {
@@ -32,7 +33,7 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     app.setApplicationName("holophonor");
     app.setOrganizationName("holophonor");
-    app.setApplicationVersion("0.1.0");
+    app.setApplicationVersion("0.2.0");
 
     // Matches the window to holophonor.desktop, so the compositor (Wayland
     // app_id) and the launcher pick up the installed icon.
@@ -56,6 +57,12 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle("Basic");
     qmlRegisterType<InkCanvas>("Holophonor", 1, 0, "InkCanvas");
     qmlRegisterUncreatableType<InstrumentModel>("Holophonor", 1, 0, "InstrumentModel", "Provided by the backend");
+
+    // Profiles first: the audio thread only ever reads them.
+    const QStringList missingProfiles = profiles::load();
+    if (!missingProfiles.isEmpty())
+        qWarning("Instrument profiles missing, those voices will be silent: %s",
+                 qPrintable(missingProfiles.join(", ")));
 
     Theme theme;
     Backend backend;

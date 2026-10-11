@@ -14,6 +14,7 @@
 #include "dsp.h"
 #include "instruments.h"
 #include "reverb.h"
+#include "spectral.h"
 
 class Synth {
 public:
@@ -85,6 +86,9 @@ private:
 
         // FM.
         dsp::Phasor carrier, modulator;
+
+        // A measured instrument.
+        SpectralVoice spectral;
     };
 
     void noteOn(int note, int velocity, ControlEvent::Source source);
@@ -93,12 +97,17 @@ private:
     void breath(BreathSource source, int value);
     bool breathMode(ControlEvent::Source source);
 
-    void articulateLead(int note, bool legato);
+    // `tongued` is false only when a breath carries straight on into a new
+    // instrument; a slur is `legato`.
+    void articulateLead(int note, bool legato, float velocity = 1.0f, bool tongued = true);
     Voice &allocate(int note, ControlEvent::Source source);
-    void start(Voice &voice, int note, float velocity, ControlEvent::Source source);
+    void start(Voice &voice, int note, float velocity, ControlEvent::Source source, bool tongued = true);
+    float glideTime(const Preset &preset) const;
     void release(Voice &voice);
     void applyPreset();
 
+    float renderSpectral(Voice &v, const float *breath, const float *bend, float *dry, float *reverb, float *chorus,
+                         int n);
     float renderWind(Voice &v, const float *breath, const float *bend, float *dry, float *reverb, float *chorus, int n);
     float renderPluck(Voice &v, const float *bend, float *dry, float *reverb, float *chorus, int n);
     float renderFm(Voice &v, const float *bend, float *dry, float *reverb, float *chorus, int n);
@@ -126,6 +135,8 @@ private:
     float m_bendTarget = 0.0f, m_bend = 0.0f;
     float m_modWheel = 0.0f;
     bool m_sustain = false;
+    bool m_portamento = false;        // CC65: the player asks for glides
+    float m_portamentoTime = 0.08f;   // CC5
 
     Reverb m_reverb;
     std::array<float, 4096> m_chorusLine{};
