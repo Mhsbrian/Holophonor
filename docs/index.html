@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Holophonor — breathe, and paint with sound</title>
+  <meta name="description" content="An instrument of the 30th century for EWI and Roland Aerophone: real measured winds that follow your breath, painted live onto raw xuan paper. For Arch Linux.">
+  <meta name="theme-color" content="#f1ebde">
+  <meta property="og:title" content="Holophonor">
+  <meta property="og:description" content="Breathe into an EWI or Aerophone and paint with sound.">
+  <meta property="og:image" content="images/og.jpg">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="images/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="paper" aria-hidden="true"></canvas>
+
+  <!-- I. The sheet: the app itself, playing. -->
+  <header class="hero" id="top">
+    <canvas id="ink" aria-hidden="true"></canvas>
+
+    <div class="corner corner--left">
+      <span class="label">Signature</span>
+      <span class="title-small">Holophonor <i class="chevron"></i></span>
+    </div>
+    <nav class="corner corner--right" aria-label="Sections">
+      <span class="label">Visual</span>
+      <span class="title-small"><i class="chevron"></i> Sumi</span>
+      <ul class="hero-nav">
+        <li><a href="#instrument">Instrument</a></li>
+        <li><a href="#voices">Voices</a></li>
+        <li><a href="#plates">Visuals</a></li>
+        <li><a href="#install">Install</a></li>
+      </ul>
+    </nav>
+
+    <div class="invitation">
+      <h1>Breathe to begin.</h1>
+      <p class="lede">An instrument of the thirtieth century, for the EWI and the Roland Aerophone.<br>
+        Real winds that follow your breath, painted live onto raw paper.</p>
+      <p class="actions">
+        <a class="ink-link" href="#voices">Listen <span aria-hidden="true">↓</span></a>
+        <a class="ink-link" href="#install">Install on Arch <span aria-hidden="true">→</span></a>
+      </p>
+    </div>
+
+    <div class="telemetry" aria-hidden="true">
+      <span id="t-note">—</span>
+      <span id="t-cents" class="soft">+00¢</span>
+      <span class="breath"><span id="t-breath"></span></span>
+      <span class="soft">breath · cc2</span>
+    </div>
+    <div class="device" aria-hidden="true"><i class="pilot"></i> AE-30</div>
+  </header>
+
+  <main>
+    <!-- I. The instrument -->
+    <section class="chapter" id="instrument">
+      <p class="numeral">I</p>
+      <div class="split">
+        <h2 class="statement">An oboe that projects light, <em>played with the breath.</em></h2>
+        <div class="prose">
+          <p>The Holophonor is the instrument of a far future: part wind, part hologram. Ours is real. Plug in a wind controller and the window becomes a sheet of raw xuan paper. Breathe, and the instrument sounds while a brush writes the melody across the sheet.</p>
+          <p>There is no mixer, no rack, no setup screen. The instrument is top left, the way the music is drawn is top right, and everything else is the paper.</p>
+          <p class="margin-note">Native C++ and Qt Quick · PipeWire at 2.7 ms · ALSA hot-plug · follows your Omarchy theme</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- II. Sensors -->
+    <section class="chapter" id="breath">
+      <p class="numeral">II</p>
+      <h2 class="chapter-title">Plug in. <em>Breathe.</em></h2>
+      <p class="chapter-intro">An EWI or Aerophone is found the moment the kernel sees it. Every sensor means what it means on a real horn.</p>
+      <dl class="sensors">
+        <div class="sensor">
+          <dt><span class="label">Breath</span><span class="midi">CC2 · CC11 · CC7 · AT</span></dt>
+          <dd>Loudness and timbre together, continuously from pp to ff. Blow harder and the tone brightens, as it does on the real instrument.</dd>
+        </div>
+        <div class="sensor">
+          <dt><span class="label">Tongue</span><span class="midi">note on · velocity</span></dt>
+          <dd>A new attack, and a real one: the recorded soft, normal or accented attack of that very note, chosen by how hard you tongued.</dd>
+        </div>
+        <div class="sensor">
+          <dt><span class="label">Slur</span><span class="midi">on before off</span></dt>
+          <dd>The pitch moves at once, with only the brief settle of a bore finding its new note. Instruments slur; they don't slide.</dd>
+        </div>
+        <div class="sensor">
+          <dt><span class="label">Bite</span><span class="midi">pitch bend</span></dt>
+          <dd>Your vibrato, and only yours. Pitch, loudness and tone move together, the way a jaw vibrato does. Nothing robotic is added.</dd>
+        </div>
+        <div class="sensor">
+          <dt><span class="label">Bend</span><span class="midi">± 2 semitones</span></dt>
+          <dd>The thumb, the plates, the joystick: bends where you put them.</dd>
+        </div>
+        <div class="sensor">
+          <dt><span class="label">Glide</span><span class="midi">CC65 · CC5</span></dt>
+          <dd>Portamento only when you ask for it.</dd>
+        </div>
+      </dl>
+    </section>
+
+    <!-- III. Voices -->
+    <section class="chapter" id="voices">
+      <p class="numeral">III</p>
+      <h2 class="chapter-title">Real instruments, <em>measured.</em></h2>
+      <div class="split split--wide">
+        <div class="prose">
+          <p>The winds are not guessed at. Each is a profile measured from real players: every note at <i>pp</i>, <i>mf</i> and <i>ff</i> (929 tones in all), from the University of Iowa Musical Instrument Samples.</p>
+          <p>A tongued note begins with the recorded attack, then hands over, in phase, to its harmonics. From there your breath moves continuously between the three recorded dynamics. Pitch is exact.</p>
+          <p class="margin-note">The same thirteen-second phrase, as an Aerophone sends it, through each voice ↓</p>
+        </div>
+        <figure class="plate plate--spectrum">
+          <svg id="spectrum" viewBox="0 0 640 360" role="img" aria-label="Alto saxophone, D4: harmonic levels at pp, mf and ff"></svg>
+          <figcaption><span class="label">Plate III</span> Alto saxophone, D4 — one note, three breaths. Harmonics in dB, as measured.</figcaption>
+        </figure>
+      </div>
+
+      <ol class="voices">
+        <li><button class="voice" data-src="audio/alto-sax.mp3"><span class="play" aria-hidden="true"></span><span class="voice-name">Alto Sax</span><span class="label">Woodwind · measured</span><span class="progress"><span></span></span></button></li>
+        <li><button class="voice" data-src="audio/tenor-sax.mp3"><span class="play" aria-hidden="true"></span><span class="voice-name">Tenor Sax</span><span class="label">Woodwind · from the alto</span><span class="progress"><span></span></span></button></li>
+        <li><button class="voice" data-src="audio/soprano-sax.mp3"><span class="play" aria-hidden="true"></span><span class="voice-name">Soprano Sax</span><span class="label">Woodwind · measured</span><span class="progress"><span></span></span></button></li>
+        <li><button class="voice" data-src="audio/clarinet.mp3"><span class="play" aria-hidden="true"></span><span class="voice-name">Clarinet</span><span class="label">Woodwind · measured</span><span class="progress"><span></span></span></button></li>
+        <li><button class="voice" data-src="audio/flute.mp3"><span class="play" aria-hidden="true"></span><span class="voice-name">Flute</span><span class="label">Woodwind · measured</span><span class="progress"><span></span></span></button></li>
+        <li><button class="voice" data-src="audio/trumpet.mp3"><span class="play" aria-hidden="true"></span><span class="voice-name">Trumpet</span><span class="label">Brass · measured</span><span class="progress"><span></span></span></button></li>
+      </ol>
+
+      <p class="catalog"><span class="label">Thirty voices</span>
+        Soprano, Alto, Tenor and Baritone Sax · Clarinet · Flute · Oboe · Bassoon · Trumpet · French Horn · Trombone · Violin · Cello · Strings · Choir · Whistle · Shakuhachi · Pan Flute · Ocarina · Analog Lead · Glass Pad · Sub Bass · Aether · Harp · Nylon Guitar · Koto · Electric Piano · Glass Bells · Marimba · and the <em>Holophonor</em> itself</p>
+    </section>
+
+    <!-- IV. Visual plates -->
+    <section class="chapter" id="plates">
+      <p class="numeral">IV</p>
+      <h2 class="chapter-title">Four ways to <em>see</em> the music.</h2>
+      <div class="plates">
+        <figure class="plate">
+          <img src="images/sumi.webp" width="1600" height="1000" loading="lazy" alt="Sumi mode: a black ink brush stroke writing the melody across raw paper, with a red seal">
+          <figcaption><span class="label">I · Sumi</span> One brush writes the melody. Pitch is height, breath is weight, rests leave space, and a vermilion seal settles each phrase.</figcaption>
+        </figure>
+        <figure class="plate">
+          <img src="images/bloom.webp" width="1600" height="1000" loading="lazy" alt="Bloom mode: watercolour pools of colour spreading across the paper">
+          <figcaption><span class="label">II · Bloom</span> A watercolour pool for every note. The circle of fifths picks the pigment from your theme; harmony shares colour.</figcaption>
+        </figure>
+        <figure class="plate">
+          <img src="images/graphite.webp" width="1600" height="1000" loading="lazy" alt="Graphite mode: an engraved score line with note names and breath hatching">
+          <figcaption><span class="label">III · Graphite</span> A draughtsman's score. A fine line for pitch, hatching for breath, every note named in small type.</figcaption>
+        </figure>
+        <figure class="plate">
+          <img src="images/projection.webp" width="1600" height="1000" loading="lazy" alt="Projection mode: a glowing gold harmonograph figure on a dark ground">
+          <figcaption><span class="label">IV · Projection</span> The Holophonor's own light: a harmonograph of the interval you are playing, in your theme's accent.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- V. Projection, live -->
+    <section class="night" id="projection">
+      <canvas id="harmonograph" aria-hidden="true"></canvas>
+      <div class="night-text">
+        <p class="numeral numeral--night">V</p>
+        <h2 class="chapter-title">The Holophonor's <em>light.</em></h2>
+        <p>Two pendulums swing at the ratio of the interval you play, losing energy as they go. Consonance draws a calm figure; dissonance, a dense one.</p>
+        <p class="interval" aria-live="off"><span class="label label--night">Interval</span> <span id="interval-name">perfect fifth</span> <span id="interval-ratio" class="soft">3 : 2</span></p>
+      </div>
+    </section>
+
+    <!-- VI. Install -->
+    <section class="chapter" id="install">
+      <p class="numeral">VI</p>
+      <h2 class="chapter-title">Install on <em>Arch.</em></h2>
+      <div class="split split--wide">
+        <div class="prose">
+          <p>Holophonor is built the way Omarchy's own apps are: one C++ binary with Qt Quick, installed as a package so it appears in the launcher. Everything it needs ships with Omarchy.</p>
+          <p class="margin-note">On plain Arch, first:<code class="block">sudo pacman -S --needed base-devel qt6-base \
+  qt6-declarative qt6-wayland libpipewire alsa-lib</code></p>
+          <p class="margin-note">On an Aerophone, send Bite as pitch bend in the scene's MIDI settings, and your bite becomes the vibrato.</p>
+        </div>
+        <div class="terminal" role="group" aria-label="Install commands">
+          <div class="terminal-bar"><i></i><i></i><i></i><span>~/Work</span><button class="copy" data-copy="git clone https://github.com/Mhsbrian/Holophonor.git&#10;cd Holophonor&#10;bin/install">copy</button></div>
+<pre><code><span class="prompt">$</span> git clone https://github.com/Mhsbrian/Holophonor.git
+<span class="prompt">$</span> cd Holophonor
+<span class="prompt">$</span> bin/install      <span class="comment"># build, package, install</span>
+
+<span class="comment"># then  Super + Space  →  Holophonor</span>
+<span class="comment"># or try it first, without installing:</span>
+<span class="prompt">$</span> bin/build &amp;&amp; build/holophonor --demo</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- VII. Keys -->
+    <section class="chapter" id="keys">
+      <p class="numeral">VII</p>
+      <h2 class="chapter-title">Keyboard <em>first.</em></h2>
+      <div class="keys">
+        <dl>
+          <div><dt><kbd>/</kbd> <kbd>Ctrl K</kbd></dt><dd>search instruments</dd></div>
+          <div><dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>previous · next instrument</dd></div>
+          <div><dt><kbd>1</kbd> – <kbd>4</kbd></dt><dd>Sumi · Bloom · Graphite · Projection</dd></div>
+          <div><dt><kbd>Space</kbd></dt><dd>a fresh sheet</dd></div>
+          <div><dt><kbd>Ctrl S</kbd></dt><dd>save the painting</dd></div>
+          <div><dt><kbd>Ctrl D</kbd></dt><dd>play the demo performance</dd></div>
+        </dl>
+        <dl>
+          <div><dt><kbd>A</kbd> <kbd>W</kbd> <kbd>S</kbd> … <kbd>K</kbd></dt><dd>play from the computer keys</dd></div>
+          <div><dt><kbd>Z</kbd> <kbd>X</kbd></dt><dd>octave down · up</dd></div>
+          <div><dt><kbd>Esc</kbd></dt><dd>silence everything</dd></div>
+          <div><dt><kbd>F11</kbd></dt><dd>full screen</dd></div>
+          <div><dt><kbd>?</kbd></dt><dd>every shortcut</dd></div>
+          <div><dt><kbd>Ctrl Q</kbd></dt><dd>quit</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <!-- VIII. Under the paper -->
+    <section class="chapter" id="built">
+      <p class="numeral">VIII</p>
+      <h2 class="chapter-title">Under <em>the paper.</em></h2>
+<pre class="diagram" aria-label="Architecture diagram"><code> wind controller ─USB─▶ ALSA sequencer ─▶ MIDI thread ─┐  lock-free queues
+                                                      ├──▶ synth · PipeWire realtime thread
+ computer keys · demo ─────────────────▶ UI thread ───┘        │ 128 frames · 48 kHz
+                                                               ├──▶ PipeWire ──▶ speakers
+                                                               ▼
+                                          snapshot · pitch · breath · note
+                                                               │ 60 Hz
+                                                               ▼
+                                     ink painter ──▶ the sheet you see</code></pre>
+      <ul class="facts">
+        <li><span class="label">Voices</span> measured spectra with recorded attacks · modelled winds · Karplus–Strong strings · FM keys</li>
+        <li><span class="label">Latency</span> 128-frame PipeWire stream; nothing on the audio thread locks or allocates</li>
+        <li><span class="label">Tests</span> 128 cases: tuning to 12 cents, slurs without glides, hot-plug on the real sequencer, painting to the pixel</li>
+        <li><span class="label">Theme</span> follows Omarchy live: the accent lights the projection, the theme's colours become the pigments</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="colophon">
+    <div class="seal" aria-hidden="true">音</div>
+    <p class="colophon-title">Holophonor</p>
+    <p>Made on Arch Linux, in the spirit of Omarchy.</p>
+    <p class="credits">Wind profiles measured from the <a href="https://theremin.music.uiowa.edu/MIS.html">University of Iowa Musical Instrument Samples</a>.
+      Set in <a href="https://github.com/notofonts/latin-greek-cyrillic">Noto Serif Display</a> and <a href="https://github.com/iaolo/iA-Fonts">iA Writer Mono</a> (SIL Open Font License).</p>
+    <p class="credits"><a href="https://github.com/Mhsbrian/Holophonor">github.com/Mhsbrian/Holophonor</a> · MIT</p>
+  </footer>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

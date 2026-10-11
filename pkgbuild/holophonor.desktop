@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Holophonor
+Comment=Breathe into an EWI and paint with sound
+Exec=holophonor
+Icon=holophonor
+Terminal=false
+Categories=AudioVideo;Audio;Music;
+Keywords=EWI;MIDI;wind;synth;instrument;breath;art;
+StartupWMClass=holophonor

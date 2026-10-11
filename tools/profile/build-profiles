@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Rebuild data/profiles/*.prof from the University of Iowa Musical Instrument
+Samples (https://theremin.music.uiowa.edu/MIS.html), which "may be downloaded
+and used for any projects, without restrictions".
+
+    tools/profile/build-profiles [instrument ...]
+
+Downloads the non-vibrato pp/mf/ff chromatic scales into ~/.cache/holophonor
+(or $HOLOPHONOR_CACHE),
+decodes them with ffmpeg to 48 kHz mono, and measures each with the profile
+tool. Needs ffmpeg and a C++ compiler; the results are committed, so building
+the app never needs any of this."""
+
+import os
+import re
+import subprocess
+import sys
+import urllib.parse
+import urllib.request
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+CACHE = os.environ.get("HOLOPHONOR_CACHE") or os.path.join(os.path.expanduser("~"), ".cache", "holophonor", "iowa")
+BASE = "https://theremin.music.uiowa.edu/sound files/MIS/"
+DYNAMICS = {"pp": 0, "mf": 1, "ff": 2}
+
+# id: (display name, folder, [file names]); the note range is in each name.
+INSTRUMENTS = {
+    "alto-sax": ("Alto Sax", "Woodwinds/altosaxophone", [
+        f"AltoSax.NoVib.{d}.{r}.aiff" for d in DYNAMICS for r in ("Db3B3", "C4B4", "C5Ab5")]),
+    "soprano-sax": ("Soprano Sax", "Woodwinds/sopranosaxophone", [
+        f"SopSax.NoVib.{d}.{r}.aiff" for d in DYNAMICS for r in ("Ab3B3", "C4B4", "C5B5", "C6Eb6")]),
+    "flute": ("Flute", "Woodwinds/flute", [
+        "Flute.nonvib.pp.B3B4.aiff", "Flute.nonvib.pp.B4Bb5.aiff", "Flute.nonvib.pp.C6Bb6.aiff",
+        "Flute.nonvib.mf.B3B4.aiff", "Flute.nonvib.mf.C5B5.aiff", "Flute.nonvib.mf.C6B6.aiff",
+        "Flute.nonvib.ff.B3B4.aiff", "Flute.nonvib.ff.C5B5.aiff", "Flute.nonvib.ff.C6B6.aiff"]),
+    "clarinet": ("Clarinet", "Woodwinds/Bbclarinet", [
+        f"BbClar.{d}.{r}.aiff" for d in DYNAMICS for r in ("D3B3", "C4B4", "C5B5", "C6B6")]),
+    "oboe": ("Oboe", "Woodwinds/oboe", [
+        f"Oboe.{d}.{r}.aiff" for d in DYNAMICS for r in ("Bb3B3", "C4B4", "C5B5", "C6Ab6")]),
+    "bassoon": ("Bassoon", "Woodwinds/bassoon", [
+        f"Bassoon.{d}.{r}.aiff" for d in DYNAMICS
+        for r in ("Bb1B1", "C2B2", "C3Bb3" if d == "ff" else "C3B3", "C4B4", "C5D5")]),
+    "trumpet": ("Trumpet", "Brass/Bbtrumpet", [
+        f"Trumpet.novib.{d}.{r}.aiff" for d in DYNAMICS
+        for r in ("E3B3", "C4B4", "C5B5", "C6D6" if d == "mf" else "C6Eb6")]),
+    "french-horn": ("French Horn", "Brass/frenchhorn", [
+        "Horn.pp.Bb1B1.aiff", "Horn.pp.C4B4.aiff", "Horn.pp.C5F5.aiff",
+        "Horn.mf.Bb1B1.aiff", "Horn.mf.C2B2.aiff", "Horn.mf.C4B4.aiff", "Horn.mf.C5F5.aiff",
+        "Horn.ff.Bb1B1.aiff", "Horn.ff.C2B2.aiff", "Horn.ff.C3B3.aiff", "Horn.ff.C4B4.aiff", "Horn.ff.C5F5.aiff"]),
+    "trombone": ("Trombone", "Brass/tenortrombone", [
+        "TenorTrombone.pp. E2B2.aiff", "TenorTrombone.pp.C3B3.aiff", "TenorTrombone.pp.C4B4.aiff",
+        "TenorTrombone.mf. E2B2.aiff", "TenorTrombone.mf.C3B3.aiff", "TenorTrombone.mf.C4B4.aiff",
+        "TenorTrombone.ff. E2B2.aiff", "TenorTrombone.ff.C3B3.aiff", "TenorTrombone.ff.C4B4.aiff"]),
+}
+
+NOTE = re.compile(r"([A-G])([b#]?)(\d)")
+PITCH_CLASS = {"C": 0, "D": 2, "E": 4, "F": 5, "G": 7, "A": 9, "B": 11}
+
+
+def midi(name):
+    letter, accidental, octave = NOTE.fullmatch(name).groups()
+    return 12 * (int(octave) + 1) + PITCH_CLASS[letter] + {"": 0, "b": -1, "#": 1}[accidental]
+
+
+def note_range(filename):
+    span = filename.rsplit(".", 2)[-2].strip()
+    names = [m.group(0) for m in NOTE.finditer(span)]
+    return midi(names[0]), midi(names[-1])
+
+
+def dynamic(filename):
+    for part in filename.split("."):
+        if part.strip() in DYNAMICS:
+            return DYNAMICS[part.strip()]
+    raise ValueError(filename)
+
+
+def fetch(folder, filename):
+    os.makedirs(CACHE, exist_ok=True)
+    aiff = os.path.join(CACHE, filename.replace(" ", ""))
+    if not os.path.exists(aiff):
+        url = urllib.parse.quote(BASE + folder + "/" + filename, safe=":/")
+        print(f"  downloading {filename}", flush=True)
+        with urllib.request.urlopen(url, timeout=300) as response, open(aiff + ".part", "wb") as out:
+            out.write(response.read())
+        os.replace(aiff + ".part", aiff)
+    raw = aiff[: -len(".aiff")] + ".f32"
+    if not os.path.exists(raw):
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", aiff, "-ac", "1", "-ar", "48000",
+                        "-f", "f32le", raw], check=True)
+    return raw
+
+
+def main():
+    wanted = sys.argv[1:] or list(INSTRUMENTS)
+    tool = os.path.join(CACHE, "profile-tool")
+    os.makedirs(CACHE, exist_ok=True)
+    subprocess.run(["c++", "-O2", "-std=c++17", "-I" + os.path.join(ROOT, "src"),
+                    os.path.join(ROOT, "tools", "profile", "profile.cpp"),
+                    os.path.join(ROOT, "src", "profile.cpp"), "-o", tool], check=True)
+    for instrument in wanted:
+        name, folder, files = INSTRUMENTS[instrument]
+        print(f"{instrument}:", flush=True)
+        args = []
+        for filename in files:
+            first, last = note_range(filename)
+            args += [fetch(folder, filename), str(dynamic(filename)), str(first), str(last)]
+        out = os.path.join(ROOT, "data", "profiles", instrument + ".prof")
+        subprocess.run([tool, name, out] + args, check=True)
+
+
+if __name__ == "__main__":
+    main()
